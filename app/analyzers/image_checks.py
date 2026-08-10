@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 from itertools import product
 
@@ -25,13 +24,20 @@ INDIAN_STATES = {
     "SK", "TN", "TR", "TS", "UK", "UP", "WB",
 }
 
-# Typical normalized registration lengths.
+# Normalized plate lengths.
+#
+# Examples:
+#   KA01AB1234 -> 10
+#   DL8CAF1234 -> 10
+#   MH12DE1234 -> 10
+#
+# Some valid registrations can be shorter, so we allow 8-10.
 PLATE_LENGTHS = range(8, 11)
 
-# Examples:
-# KA01AB1234
-# DL8CAF1234
-# MH12DE1234
+
+# ------------------------------------------------------------
+# Standard Indian registration
+# ------------------------------------------------------------
 STRICT_PLATE_PATTERN = re.compile(
     r"(?<![A-Z0-9])"
     r"([A-Z]{2})"
@@ -44,27 +50,42 @@ STRICT_PLATE_PATTERN = re.compile(
     r"(?![A-Z0-9])"
 )
 
-# Bharat Series:
-# 22BH1234AB
+
+# ------------------------------------------------------------
+# Bharat Series
+#
+# Examples:
+#   22BH1234AB
+#   24BH1234AA
+# ------------------------------------------------------------
 BH_SERIES_PATTERN = re.compile(
     r"(?<![A-Z0-9])"
     r"([0-9]{2})"
     r"[\s\-_.:/]*BH"
-    r"[\s\-_.:/]*([0-9]{4})"
-    r"[\s\-_.:/]*([A-Z]{1,2})"
+    r"[\s\-_.:/]*"
+    r"([0-9]{4})"
+    r"[\s\-_.:/]*"
+    r"([A-Z]{1,2})"
     r"(?![A-Z0-9])"
 )
 
-# Common OCR mistakes where a character can look like a digit.
+
+# ============================================================
+# OCR CORRECTIONS
+# ============================================================
+
+# Corrections for positions that should contain digits.
 DIGIT_CORRECTIONS = {
     "O": "0",
     "I": "1",
+    "L": "1",
     "S": "5",
     "B": "8",
     "Q": "0",
+    "G": "6",
 }
 
-# Common OCR mistakes inside alphabetic series.
+# Corrections for positions that should contain letters.
 SERIES_CORRECTIONS = {
     "0": ("O",),
     "1": ("I", "W"),
@@ -82,7 +103,10 @@ def blur(image: np.ndarray) -> dict:
     """Estimate blur using Laplacian variance."""
 
     variance = float(
-        cv2.Laplacian(gray(image), cv2.CV_64F).var()
+        cv2.Laplacian(
+            gray(image),
+            cv2.CV_64F,
+        ).var()
     )
 
     warning = variance < settings.blur_threshold
@@ -95,12 +119,12 @@ def blur(image: np.ndarray) -> dict:
             else "Sufficient edge detail detected."
         ),
         score=round(
-            min(1, variance / settings.blur_threshold),
+            min(1.0, variance / settings.blur_threshold),
             3,
         ),
         confidence=0.82,
         measurement={
-            "laplacian_variance": round(variance, 2)
+            "laplacian_variance": round(variance, 2),
         },
         threshold=settings.blur_threshold,
     )
@@ -188,7 +212,7 @@ def dimensions(image: np.ndarray) -> dict:
 # ============================================================
 
 def perceptual_hash(image: np.ndarray) -> str:
-    """Generate an average perceptual hash."""
+    """Generate a simple 64-bit average perceptual hash."""
 
     sample = cv2.resize(
         gray(image),
@@ -241,9 +265,12 @@ def duplicate(
             "warning",
             "Near-duplicate signal found using average-hash distance.",
             classification="near_duplicate",
-            confidence=round(1 - nearest / 64, 2),
+            confidence=round(
+                1 - nearest / 64,
+                2,
+            ),
             measurement={
-                "nearest_hamming_distance": nearest
+                "nearest_hamming_distance": nearest,
             },
             threshold=8,
         )
@@ -253,7 +280,7 @@ def duplicate(
         "No exact or near duplicate found among existing uploads.",
         classification="not_duplicate",
         measurement={
-            "nearest_hamming_distance": nearest
+            "nearest_hamming_distance": nearest,
         },
         threshold=8,
     )
@@ -264,13 +291,17 @@ def duplicate(
 # ============================================================
 
 def normalize_ocr(text: str) -> str:
-    """Normalize OCR text without changing characters."""
+    """Normalize OCR text while preserving useful word boundaries."""
 
-    return re.sub(
-        r"\s+",
-        " ",
-        text.upper(),
-    ).strip()
+    if not text:
+        return ""
+
+    text = text.upper()
+
+    # Normalize common whitespace.
+    text = re.sub(r"\s+", " ", text)
+
+    return text.strip()
 
 
 def normalize_plate(candidate: str) -> str:
@@ -283,29 +314,51 @@ def normalize_plate(candidate: str) -> str:
     )
 
 
-def plate_candidates_from_text(
-    raw_text: str,
-) -> list[dict]:
-    """
-    Extract Indian registration candidates from OCR.
+# ============================================================
+# PLATE CANDIDATE HELPERS
+# ============================================================
 
-    Uses:
-    1. Strict matching first.
-    2. BH-series matching.
-    3. Conservative OCR correction fallback.
-    """
+def _add_candidate(
+    candidates: list[dict],
+    candidate: str,
+    *,
+    strict: bool,
+    correction_count: int,
+) -> None:
+    """Add a valid-looking plate candidate."""
 
-    text = normalize_ocr(raw_text)
+    candidate = normalize_plate(candidate)
+
+    if len(candidate) not in PLATE_LENGTHS:
+        return
+
+    if correction_count > 2:
+        return
+
+    candidates.append(
+        {
+            "candidate": candidate,
+            "strict": strict,
+            "correction_count": correction_count,
+        }
+    )
+
+
+def _strict_candidates(text: str) -> list[dict]:
+    """Find exact-format registration candidates."""
 
     candidates: list[dict] = []
 
     # --------------------------------------------------------
-    # STRICT NORMAL INDIAN PLATE
+    # Normal Indian registrations
     # --------------------------------------------------------
 
     for match in STRICT_PLATE_PATTERN.finditer(text):
 
         state, district, series, serial = match.groups()
+
+        if state not in INDIAN_STATES:
+            continue
 
         candidate = (
             f"{state}"
@@ -314,20 +367,15 @@ def plate_candidates_from_text(
             f"{serial}"
         )
 
-        if (
-            state in INDIAN_STATES
-            and len(candidate) in PLATE_LENGTHS
-        ):
-            candidates.append(
-                {
-                    "candidate": candidate,
-                    "strict": True,
-                    "correction_count": 0,
-                }
-            )
+        _add_candidate(
+            candidates,
+            candidate,
+            strict=True,
+            correction_count=0,
+        )
 
     # --------------------------------------------------------
-    # BH SERIES
+    # Bharat Series
     # --------------------------------------------------------
 
     for match in BH_SERIES_PATTERN.finditer(text):
@@ -341,29 +389,43 @@ def plate_candidates_from_text(
             f"{suffix}"
         )
 
-        if len(candidate) in PLATE_LENGTHS:
-            candidates.append(
-                {
-                    "candidate": candidate,
-                    "strict": True,
-                    "correction_count": 0,
-                }
-            )
+        _add_candidate(
+            candidates,
+            candidate,
+            strict=True,
+            correction_count=0,
+        )
 
-    # Strict result exists — don't correction-mine it.
-    if candidates:
+    return candidates
+
+
+def _corrected_candidates(text: str) -> list[dict]:
+    """
+    Find possible registration numbers using conservative OCR
+    character correction.
+
+    The correction fallback is intentionally strict so that
+    arbitrary OCR garbage cannot be converted into a vehicle
+    registration number.
+    """
+
+    candidates: list[dict] = []
+
+    # --------------------------------------------------------
+    # SAFETY GUARD
+    # --------------------------------------------------------
+    #
+    # OCR output containing too many separate words is more
+    # likely to be surrounding text / garbage than a plate.
+    #
+    # Examples:
+    #
+    #   "KA 01 AB 1234"       -> 4 tokens -> allowed
+    #   "22 BH 1234 AA"       -> 4 tokens -> allowed
+    #   "PS Y Y G A S 2 BS RS AS" -> 9 tokens -> reject
+    #
+    if len(text.split()) > 4:
         return candidates
-
-    # --------------------------------------------------------
-    # SAFETY BOUND
-    # --------------------------------------------------------
-
-    # Relaxed from the earlier 32-character restriction.
-    # This allows OCR output containing a little more surrounding
-    # text while still preventing massive OCR garbage from being
-    # brute-force searched.
-    if len(text) > 32 or len(text.split()) > 4:
-        return []
 
     compact = re.sub(
         r"[^A-Z0-9]",
@@ -371,12 +433,21 @@ def plate_candidates_from_text(
         text,
     )
 
+    # Don't process empty OCR.
+    if not compact:
+        return candidates
+
+    # Don't brute-force very large OCR output.
+    if len(compact) > 32:
+        return candidates
+
     # --------------------------------------------------------
-    # CONSERVATIVE OCR CORRECTION
+    # Search for state-code candidates.
     # --------------------------------------------------------
 
     for start in range(
-        max(0, len(compact) - 7)
+        0,
+        max(0, len(compact) - 7),
     ):
 
         state = compact[start:start + 2]
@@ -384,41 +455,64 @@ def plate_candidates_from_text(
         if state not in INDIAN_STATES:
             continue
 
+        # Typical Indian plate:
+        #
+        # STATE + 1/2 digit district
+        #       + 1/2/3 letter series
+        #       + 1/2/3/4 digit serial
+        #
         for district_size in (1, 2):
 
             for series_size in (1, 2, 3):
 
                 for serial_size in (1, 2, 3, 4):
 
-                    end = (
-                        start
-                        + 2
+                    total_size = (
+                        2
                         + district_size
                         + series_size
                         + serial_size
                     )
+
+                    end = start + total_size
+
+                    if end > len(compact):
+                        continue
 
                     token = compact[start:end]
 
                     if len(token) not in PLATE_LENGTHS:
                         continue
 
-                    district_raw = token[
-                        2:2 + district_size
-                    ]
+                    district_start = 2
 
-                    series_start = (
-                        2 + district_size
+                    district_end = (
+                        district_start
+                        + district_size
                     )
 
+                    series_start = district_end
+
+                    series_end = (
+                        series_start
+                        + series_size
+                    )
+
+                    district_raw = token[
+                        district_start:district_end
+                    ]
+
                     series_raw = token[
-                        series_start:
-                        series_start + series_size
+                        series_start:series_end
                     ]
 
                     serial_raw = token[
-                        series_start + series_size:
+                        series_end:
                     ]
+
+                    # ------------------------------------------------
+                    # Correct digit positions
+                    # ------------------------------------------------
 
                     district = "".join(
                         DIGIT_CORRECTIONS.get(
@@ -436,21 +530,28 @@ def plate_candidates_from_text(
                         for char in serial_raw
                     )
 
-                    if (
-                        not district.isdigit()
-                        or not serial.isdigit()
-                    ):
+                    if not district.isdigit():
                         continue
 
-                    for parts in product(
-                        *(
-                            SERIES_CORRECTIONS.get(
-                                char,
-                                (char,),
-                            )
-                            for char in series_raw
+                    if not serial.isdigit():
+                        continue
+
+                    # ------------------------------------------------
+                    # Correct letter-series positions
+                    # ------------------------------------------------
+
+                    possibilities = []
+
+                    for char in series_raw:
+
+                        options = SERIES_CORRECTIONS.get(
+                            char,
+                            (char,),
                         )
-                    ):
+
+                        possibilities.append(options)
+
+                    for parts in product(*possibilities):
 
                         series = "".join(parts)
 
@@ -478,40 +579,77 @@ def plate_candidates_from_text(
                         )
 
                         # Maximum two OCR corrections.
-                        if corrections <= 2:
-                            candidates.append(
-                                {
-                                    "candidate": (
-                                        f"{state}"
-                                        f"{district}"
-                                        f"{series}"
-                                        f"{serial}"
-                                    ),
-                                    "strict": False,
-                                    "correction_count": corrections,
-                                }
-                            )
+                        if corrections > 2:
+                            continue
+
+                        candidate = (
+                            state
+                            + district
+                            + series
+                            + serial
+                        )
+
+                        _add_candidate(
+                            candidates,
+                            candidate,
+                            strict=False,
+                            correction_count=corrections,
+                        )
+
+    return candidates
+
+
+def plate_candidates_from_text(
+    raw_text: str,
+) -> list[dict]:
+    """
+    Extract Indian registration candidates from OCR.
+
+    Order:
+      1. Strict standard registration.
+      2. Strict Bharat Series.
+      3. Conservative OCR correction.
+    """
+
+    text = normalize_ocr(raw_text)
+
+    if not text:
+        return []
 
     # --------------------------------------------------------
-    # REMOVE DUPLICATES
+    # FIRST: strict matching
+    # --------------------------------------------------------
+
+    strict = _strict_candidates(text)
+
+    if strict:
+        return strict
+
+    # --------------------------------------------------------
+    # SECOND: conservative correction
+    # --------------------------------------------------------
+
+    corrected = _corrected_candidates(text)
+
+    # --------------------------------------------------------
+    # Remove duplicates.
+    # Prefer candidates with fewer corrections.
     # --------------------------------------------------------
 
     unique: dict[str, dict] = {}
 
-    for candidate in candidates:
+    for candidate in corrected:
 
-        previous = unique.get(
-            candidate["candidate"]
-        )
+        key = candidate["candidate"]
+
+        previous = unique.get(key)
 
         if (
             previous is None
             or candidate["correction_count"]
             < previous["correction_count"]
         ):
-            unique[
-                candidate["candidate"]
-            ] = candidate
+            unique[key] = candidate
 
     return list(unique.values())
 
@@ -519,7 +657,15 @@ def plate_candidates_from_text(
 def validate_indian_plate(
     raw_text: str,
 ) -> dict:
-    """Validate a broad Indian or BH-series registration."""
+    """
+    Validate a broad Indian or Bharat Series registration.
+
+    IMPORTANT:
+    This is probabilistic OCR validation. It does not prove that
+    the registration number actually belongs to a vehicle.
+    """
+
+    raw_text = raw_text or ""
 
     candidates = plate_candidates_from_text(
         raw_text
@@ -530,12 +676,15 @@ def validate_indian_plate(
             "warning",
             "No broad Indian registration number was reliably detected.",
             classification="invalid_or_not_detected",
-            raw_ocr_text=raw_text or "",
+            raw_ocr_text=raw_text,
             normalized_candidate="",
             confidence=0.2,
             correction_applied=False,
         )
 
+    # Prefer:
+    #   1. Strict candidates
+    #   2. Fewer OCR corrections
     best = min(
         candidates,
         key=lambda candidate: (
@@ -544,11 +693,18 @@ def validate_indian_plate(
         ),
     )
 
-    # Strong strict match.
+    # --------------------------------------------------------
+    # Strict match
+    # --------------------------------------------------------
+
     if best["strict"]:
+
         return result(
             "pass",
-            "Likely Indian vehicle registration number detected; OCR errors remain possible.",
+            (
+                "Likely Indian vehicle registration number detected; "
+                "OCR errors remain possible."
+            ),
             classification="likely_valid",
             raw_ocr_text=raw_text,
             normalized_candidate=best["candidate"],
@@ -556,10 +712,16 @@ def validate_indian_plate(
             correction_applied=False,
         )
 
-    # Corrected OCR candidate.
+    # --------------------------------------------------------
+    # Corrected OCR match
+    # --------------------------------------------------------
+
     return result(
         "warning",
-        "Possible registration number detected after conservative OCR correction.",
+        (
+            "Possible registration number detected after "
+            "conservative OCR correction."
+        ),
         classification="uncertain",
         raw_ocr_text=raw_text,
         normalized_candidate=best["candidate"],
@@ -659,7 +821,7 @@ def photo_of_photo(image: np.ndarray) -> dict:
         maxLineGap=15,
     )
 
-    rectangles = (
+    line_count = (
         0
         if lines is None
         else len(lines)
@@ -697,7 +859,7 @@ def photo_of_photo(image: np.ndarray) -> dict:
 
     score = min(
         1.0,
-        rectangles / 20 * 0.6
+        line_count / 20 * 0.6
         + (0.4 if border > 30 else 0),
     )
 
@@ -708,9 +870,12 @@ def photo_of_photo(image: np.ndarray) -> dict:
             if score > 0.6
             else "No strong photo-of-photo signal."
         ),
-        heuristic_score=round(score, 2),
+        heuristic_score=round(
+            score,
+            2,
+        ),
         signals={
-            "long_line_count": rectangles,
+            "long_line_count": line_count,
             "border_edge_strength": round(
                 border,
                 2,

@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, JSON, String, Text, func, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.database import Base
+from sqlalchemy import LargeBinary
 
 
 class ProcessingStatus(str, enum.Enum):
@@ -34,6 +35,7 @@ class Upload(Base):
     original_filename: Mapped[str] = mapped_column(String(255))
     stored_filename: Mapped[str] = mapped_column(String(255), unique=True)
     file_path: Mapped[str] = mapped_column(String(1024))
+    image_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     mime_type: Mapped[str] = mapped_column(String(100))
     file_size: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64), index=True)

@@ -54,7 +54,7 @@ async def save_upload(file: UploadFile, db: Session) -> Upload:
     path.write_bytes(data)
     try:
         safe_original_name = Path((file.filename or "upload").replace("\\", "/")).name
-        record = Upload(id=upload_id, original_filename=safe_original_name, stored_filename=stored_filename, file_path=str(path), mime_type=actual_mime or mimetypes.guess_type(stored_filename)[0] or "application/octet-stream", file_size=len(data), sha256=hashlib.sha256(data).hexdigest(), perceptual_hash=perceptual_hash(image), status=ProcessingStatus.pending)
+        record = Upload(id=upload_id, original_filename=safe_original_name, stored_filename=stored_filename, file_path=str(path),image_data=data, mime_type=actual_mime or mimetypes.guess_type(stored_filename)[0] or "application/octet-stream", file_size=len(data), sha256=hashlib.sha256(data).hexdigest(), perceptual_hash=perceptual_hash(image), status=ProcessingStatus.pending)
         db.add(record)
         db.commit()
         db.refresh(record)
