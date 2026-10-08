@@ -9,6 +9,11 @@ import cv2
 import numpy as np
 import pytesseract
 
+try:
+    from rapidocr_onnxruntime import RapidOCR
+except ImportError:
+    RapidOCR = None
+
 from app.analyzers.common import result
 from app.analyzers.image_checks import (
     normalize_ocr,
@@ -33,12 +38,115 @@ PLATE_WHITELIST = (
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 
-# Keep this reasonably small because every region is OCR'd many times.
+# Maximum number of plate regions considered.
 MAX_PLATE_REGIONS = 10
+
+# To avoid excessive OCR processing, only the strongest regions
+# are sent through the full OCR pipeline.
+OCR_REGIONS_TO_PROCESS = 5
 
 DEBUG_DIR = Path(
     "/data/uploads/plate_debug"
 )
+
+
+# ---------------------------------------------------------------------------
+# RAPIDOCR
+# ---------------------------------------------------------------------------
+
+_rapidocr_engine = None
+
+
+def _get_rapidocr():
+    """
+    Create the RapidOCR engine lazily and reuse it.
+
+    Loading the OCR model for every image would be expensive.
+    """
+    global _rapidocr_engine
+
+    if RapidOCR is None:
+        return None
+
+    if _rapidocr_engine is None:
+        _rapidocr_engine = RapidOCR()
+
+    return _rapidocr_engine
+
+
+def _rapidocr(
+    image: np.ndarray,
+) -> tuple[str, float | None]:
+    """
+    Run RapidOCR on an image.
+
+    Returns:
+        (recognized_text, normalized_confidence)
+    """
+
+    engine = _get_rapidocr()
+
+    if engine is None:
+        return "", None
+
+    if image is None or image.size == 0:
+        return "", None
+
+    try:
+        result_data, _ = engine(image)
+
+        if not result_data:
+            return "", None
+
+        texts: list[str] = []
+        confidences: list[float] = []
+
+        for item in result_data:
+
+            if len(item) < 3:
+                continue
+
+            text = str(item[1]).strip()
+
+            try:
+                confidence = float(item[2])
+            except (
+                ValueError,
+                TypeError,
+            ):
+                confidence = 0.0
+
+            if text:
+                texts.append(text)
+
+            if confidence > 0:
+                confidences.append(
+                    confidence
+                )
+
+        text = " ".join(texts)
+
+        average_confidence = (
+            round(
+                sum(confidences)
+                / len(confidences),
+                3,
+            )
+            if confidences
+            else None
+        )
+
+        return (
+            text,
+            average_confidence,
+        )
+
+    except Exception as exc:
+        print(
+            f"[RapidOCR ERROR] {exc}"
+        )
+
+        return "", None
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +192,9 @@ def _ocr(
             continue
 
         if confidence >= 0:
-            confidences.append(confidence)
+            confidences.append(
+                confidence
+            )
 
     text = " ".join(words)
 
@@ -99,7 +209,10 @@ def _ocr(
         else None
     )
 
-    return text, average_confidence
+    return (
+        text,
+        average_confidence,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +248,42 @@ def extract_text(
         8,
     )
 
+    # ---------------------------------------------------------------
+    # Try RapidOCR first
+    # ---------------------------------------------------------------
+
     try:
+        rapid_text, rapid_confidence = (
+            _rapidocr(enlarged)
+        )
+
+        if rapid_text:
+
+            return result(
+                "pass",
+                "Full-image RapidOCR text extracted.",
+                raw_text=rapid_text,
+                normalized_text=normalize_ocr(
+                    rapid_text
+                ),
+                meaningful_text=True,
+                confidence=rapid_confidence,
+                engine="rapidocr",
+            )
+
+    except Exception as exc:
+
+        print(
+            f"[RapidOCR FULL IMAGE ERROR] "
+            f"{exc}"
+        )
+
+    # ---------------------------------------------------------------
+    # Tesseract fallback
+    # ---------------------------------------------------------------
+
+    try:
+
         text, confidence = _ocr(
             prepared,
             "--psm 6",
@@ -152,9 +300,12 @@ def extract_text(
                 )
             ),
             raw_text=text,
-            normalized_text=normalize_ocr(text),
+            normalized_text=normalize_ocr(
+                text
+            ),
             meaningful_text=bool(text),
             confidence=confidence,
+            engine="tesseract",
         )
 
     except (
@@ -243,9 +394,6 @@ def _yellow_dark_text_mask(
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Detect yellow plate areas and dark text appearing over yellow.
-
-    This is useful for commercial / transport plates and other
-    yellow-background registration plates.
     """
 
     hsv = cv2.cvtColor(
@@ -401,7 +549,7 @@ def detect_plate_regions(
         cv2.MORPH_CLOSE,
         cv2.getStructuringElement(
             cv2.MORPH_RECT,
-            (17, 5),
+            (35, 7),
         ),
     )
 
@@ -419,7 +567,7 @@ def detect_plate_regions(
         cv2.MORPH_CLOSE,
         cv2.getStructuringElement(
             cv2.MORPH_RECT,
-            (17, 7),
+            (35, 9),
         ),
     )
 
@@ -483,7 +631,7 @@ def detect_plate_regions(
             if (
                 box_width < min_width
                 or box_height < min_height
-                or not 1.1 <= ratio <= 8.5
+                or not 1.1 <= ratio <= 12.0
             ):
                 continue
 
@@ -549,7 +697,9 @@ def detect_plate_regions(
             )
 
             contrast = (
-                float(crop_gray.std())
+                float(
+                    crop_gray.std()
+                )
                 / 128.0
             )
 
@@ -563,33 +713,33 @@ def detect_plate_regions(
             )
 
             score = (
-                0.22 * ratio_score
-                + 0.18
+                0.27 * ratio_score
+                + 0.15
                 * min(
                     1.0,
                     rectangularity,
                 )
-                + 0.20
+                + 0.18
                 * min(
                     1.0,
                     vertical_edges * 4,
                 )
-                + 0.18
+                + 0.15
                 * min(
                     1.0,
                     text_density * 4,
                 )
-                + 0.08
+                + 0.07
                 * min(
                     1.0,
                     contrast,
                 )
-                + 0.06
+                + 0.08
                 * min(
                     1.0,
                     yellow_support * 3,
                 )
-                + 0.08
+                + 0.10
                 * min(
                     1.0,
                     dark_on_yellow_support
@@ -598,13 +748,13 @@ def detect_plate_regions(
             )
 
             padding_x = max(
-                3,
-                box_width // 12,
+                12,
+                box_width // 4,
             )
 
             padding_y = max(
-                3,
-                box_height // 4,
+                6,
+                box_height // 2,
             )
 
             left = max(
@@ -891,6 +1041,7 @@ def _save_debug_image(
     """Save debug image without breaking the pipeline."""
 
     try:
+
         path.parent.mkdir(
             parents=True,
             exist_ok=True,
@@ -902,6 +1053,7 @@ def _save_debug_image(
         )
 
     except Exception as exc:
+
         print(
             f"[DEBUG] Could not save "
             f"{path}: {exc}"
@@ -978,13 +1130,6 @@ def detect_vehicle_number(
 
     # ------------------------------------------------------------------
     # DETECT PLATE REGIONS
-    #
-    # IMPORTANT:
-    # Do not pass limit= here.
-    #
-    # This keeps compatibility with tests that monkeypatch
-    # detect_plate_regions(image) with a one-argument lambda.
-    # The function itself already defaults to MAX_PLATE_REGIONS.
     # ------------------------------------------------------------------
 
     regions = detect_plate_regions(
@@ -1025,7 +1170,7 @@ def detect_vehicle_number(
     )
 
     # ------------------------------------------------------------------
-    # SAVE CANDIDATE REGIONS
+    # SAVE ALL CANDIDATE REGIONS
     # ------------------------------------------------------------------
 
     for index, region in enumerate(
@@ -1050,11 +1195,21 @@ def detect_vehicle_number(
     )
 
     # ------------------------------------------------------------------
+    # ONLY PROCESS STRONGEST REGIONS
+    #
+    # This prevents hundreds/thousands of OCR calls on a single image.
+    # ------------------------------------------------------------------
+
+    ocr_regions = regions[
+        :OCR_REGIONS_TO_PROCESS
+    ]
+
+    # ------------------------------------------------------------------
     # OCR EACH REGION
     # ------------------------------------------------------------------
 
     for region_index, region in enumerate(
-        regions
+        ocr_regions
     ):
 
         variants = _plate_variants(
@@ -1068,15 +1223,7 @@ def detect_vehicle_number(
         )
 
         # --------------------------------------------------------------
-        # IMPORTANT TEST COMPATIBILITY
-        #
-        # Production:
-        #   ("pad0.0_gray", image)
-        #
-        # Some tests:
-        #   image
-        #
-        # Support both formats.
+        # TEST COMPATIBILITY
         # --------------------------------------------------------------
 
         for variant_index, item in enumerate(
@@ -1087,14 +1234,89 @@ def detect_vehicle_number(
                 isinstance(item, tuple)
                 and len(item) == 2
             ):
+
                 variant_name, variant = item
 
             else:
+
                 variant_name = (
                     f"variant_{variant_index}"
                 )
 
                 variant = item
+
+            # ----------------------------------------------------------
+            # RAPIDOCR FIRST
+            # ----------------------------------------------------------
+
+            try:
+
+                rapid_text, rapid_confidence = (
+                    _rapidocr(
+                        variant
+                    )
+                )
+
+            except Exception as exc:
+
+                print(
+                    f"[RapidOCR ERROR] "
+                    f"region="
+                    f"{region_index} "
+                    f"variant="
+                    f"{variant_name}: "
+                    f"{exc}"
+                )
+
+                rapid_text = ""
+                rapid_confidence = None
+
+            if rapid_text:
+
+                rapid_candidates = (
+                    plate_candidates_from_text(
+                        rapid_text
+                    )
+                )
+
+                print(
+                    f"RapidOCR "
+                    f"region="
+                    f"{region_index} "
+                    f"variant="
+                    f"{variant_name} "
+                    f"confidence="
+                    f"{rapid_confidence} "
+                    f"text="
+                    f"{rapid_text!r} "
+                    f"candidates="
+                    f"{rapid_candidates}"
+                )
+
+                attempts.append(
+                    {
+                        "raw_text": rapid_text,
+                        "ocr_confidence": (
+                            rapid_confidence
+                        ),
+                        "source": (
+                            f"rapidocr_region_"
+                            f"{region_index}"
+                        ),
+                        "region_score": (
+                            region["score"]
+                        ),
+                        "support_key": (
+                            "rapidocr",
+                            region_index,
+                            variant_index,
+                        ),
+                    }
+                )
+
+            # ----------------------------------------------------------
+            # TESSERACT FALLBACK / SECOND OPINION
+            # ----------------------------------------------------------
 
             for config in PLATE_CONFIGS:
 
@@ -1119,7 +1341,7 @@ def detect_vehicle_number(
                 ) as exc:
 
                     print(
-                        f"[OCR ERROR] "
+                        f"[Tesseract ERROR] "
                         f"region="
                         f"{region_index} "
                         f"variant="
@@ -1141,7 +1363,7 @@ def detect_vehicle_number(
                 )
 
                 print(
-                    f"OCR "
+                    f"Tesseract "
                     f"region="
                     f"{region_index} "
                     f"variant="
@@ -1164,9 +1386,9 @@ def detect_vehicle_number(
                             f"plate_region_"
                             f"{region_index}"
                         ),
-                        "region_score": region[
-                            "score"
-                        ],
+                        "region_score": (
+                            region["score"]
+                        ),
                         "support_key": (
                             region_index,
                             variant_index,
@@ -1217,6 +1439,7 @@ def detect_vehicle_number(
 
             # Full-image OCR is noisy.
             # Only accept strict candidates from it.
+
             if (
                 attempt["source"]
                 == "full_image"
@@ -1291,6 +1514,9 @@ def detect_vehicle_number(
             evidence={
                 "plate_regions_considered": (
                     len(regions)
+                ),
+                "ocr_regions_processed": (
+                    len(ocr_regions)
                 ),
                 "ocr_attempts": (
                     len(attempts)
@@ -1377,7 +1603,10 @@ def detect_vehicle_number(
 
     from_region = any(
         entry["source"].startswith(
-            "plate_region"
+            (
+                "plate_region",
+                "rapidocr_region",
+            )
         )
         for entry in entries
     )
@@ -1416,6 +1645,38 @@ def detect_vehicle_number(
     )
 
     # ------------------------------------------------------------------
+    # ENGINE AGREEMENT BONUS
+    # ------------------------------------------------------------------
+
+    engines = set()
+
+    for entry in entries:
+
+        source = entry[
+            "source"
+        ]
+
+        if source.startswith(
+            "rapidocr_region"
+        ):
+            engines.add(
+                "rapidocr"
+            )
+
+        elif source.startswith(
+            "plate_region"
+        ):
+            engines.add(
+                "tesseract"
+            )
+
+    engine_agreement_bonus = (
+        0.06
+        if len(engines) >= 2
+        else 0.0
+    )
+
+    # ------------------------------------------------------------------
     # FINAL CONFIDENCE
     # ------------------------------------------------------------------
 
@@ -1432,6 +1693,7 @@ def detect_vehicle_number(
             if from_region
             else 0.0
         )
+        + engine_agreement_bonus
         + min(
             0.12,
             0.04
@@ -1501,11 +1763,20 @@ def detect_vehicle_number(
             "plate_regions_considered": (
                 len(regions)
             ),
+            "ocr_regions_processed": (
+                len(ocr_regions)
+            ),
             "ocr_attempts": (
                 len(attempts)
             ),
             "matching_attempts": (
                 len(support_keys)
+            ),
+            "ocr_engines": sorted(
+                engines
+            ),
+            "engine_agreement": (
+                len(engines) >= 2
             ),
             "sources": sorted(
                 {
