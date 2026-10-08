@@ -902,32 +902,19 @@ def _add_padding(
 
 def _plate_variants(
     crop: np.ndarray,
-) -> list[
-    tuple[str, np.ndarray]
-]:
-    """Generate multiple preprocessing variants for OCR."""
+) -> list[tuple[str, np.ndarray]]:
+    """Generate a small, high-value set of preprocessing variants for OCR."""
 
-    if (
-        crop is None
-        or crop.size == 0
-    ):
+    if crop is None or crop.size == 0:
         return []
 
-    variants: list[
-        tuple[str, np.ndarray]
-    ] = []
+    variants: list[tuple[str, np.ndarray]] = []
 
-    for padding in (
-        0.00,
-        0.10,
-        0.20,
-        0.30,
-    ):
+    # Keep the paddings that are most useful for plate OCR.
+    # pad0.2_otsu was successful on the test vehicle image.
+    for padding in (0.20, 0.00):
 
-        padded = _add_padding(
-            crop,
-            padding,
-        )
+        padded = _add_padding(crop, padding)
 
         gray = cv2.cvtColor(
             padded,
@@ -957,8 +944,7 @@ def _plate_variants(
             denoised,
             0,
             255,
-            cv2.THRESH_BINARY
-            + cv2.THRESH_OTSU,
+            cv2.THRESH_BINARY + cv2.THRESH_OTSU,
         )[1]
 
         adaptive = cv2.adaptiveThreshold(
@@ -970,38 +956,10 @@ def _plate_variants(
             7,
         )
 
-        variants.extend(
-            [
-                (
-                    f"pad{padding}_gray",
-                    enlarged,
-                ),
-                (
-                    f"pad{padding}_clahe",
-                    clahe,
-                ),
-                (
-                    f"pad{padding}_otsu",
-                    otsu,
-                ),
-                (
-                    f"pad{padding}_otsu_inv",
-                    cv2.bitwise_not(
-                        otsu
-                    ),
-                ),
-                (
-                    f"pad{padding}_adaptive",
-                    adaptive,
-                ),
-            ]
-        )
-
-        _, dark_on_yellow = (
-            _yellow_dark_text_mask(
-                padded,
-                gray,
-            )
+        # Yellow plate / dark text preprocessing
+        _, dark_on_yellow = _yellow_dark_text_mask(
+            padded,
+            gray,
         )
 
         yellow_dark = cv2.resize(
@@ -1015,14 +973,20 @@ def _plate_variants(
         variants.extend(
             [
                 (
-                    f"pad{padding}_yellow_dark",
-                    yellow_dark,
+                    f"pad{padding}_otsu",
+                    otsu,
                 ),
                 (
-                    f"pad{padding}_yellow_dark_inv",
-                    cv2.bitwise_not(
-                        yellow_dark
-                    ),
+                    f"pad{padding}_gray",
+                    enlarged,
+                ),
+                (
+                    f"pad{padding}_adaptive",
+                    adaptive,
+                ),
+                (
+                    f"pad{padding}_yellow_dark",
+                    yellow_dark,
                 ),
             ]
         )
@@ -1207,6 +1171,7 @@ def detect_vehicle_number(
     # ------------------------------------------------------------------
     # OCR EACH REGION
     # ------------------------------------------------------------------
+    strong_plate_found = False
 
     for region_index, region in enumerate(
         ocr_regions
@@ -1314,11 +1279,34 @@ def detect_vehicle_number(
                     }
                 )
 
+                # Stop immediately when RapidOCR finds a strong,
+                # strictly valid Indian registration number.
+                strong_candidate = next(
+                    (
+                        candidate
+                        for candidate in rapid_candidates
+                        if candidate.get("strict")
+                        and rapid_confidence is not None
+                        and rapid_confidence >= 0.90
+                    ),
+                    None,
+                )
+
+                if strong_candidate:
+                    print(
+                        f"[EARLY STOP] Strong plate found: "
+                        f"{strong_candidate['candidate']} "
+                        f"confidence={rapid_confidence}"
+                    )
+
+                    strong_plate_found = True
+                    break
+
             # ----------------------------------------------------------
             # TESSERACT FALLBACK / SECOND OPINION
             # ----------------------------------------------------------
 
-            for config in PLATE_CONFIGS:
+            for config in PLATE_CONFIGS[:2]:
 
                 try:
 
@@ -1396,6 +1384,9 @@ def detect_vehicle_number(
                         ),
                     }
                 )
+
+        if strong_plate_found:
+            break
 
     # ------------------------------------------------------------------
     # SAVE OCR OUTPUT

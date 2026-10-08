@@ -5,11 +5,18 @@ from sqlalchemy import text
 from app.api import router
 from app.core.logging import configure_logging
 from app.db.database import SessionLocal
+from fastapi.middleware.cors import CORSMiddleware
 
 configure_logging()
 app = FastAPI(title="Intelligent Media Processing Pipeline", version="1.0.0", description="Asynchronous heuristic screening for uploaded vehicle images.")
 app.include_router(router)
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.exception_handler(HTTPException)
 async def http_error(_: Request, exc: HTTPException):
