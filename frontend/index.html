@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -16,18 +18,27 @@
         rel="stylesheet"
         href="css/style.css"
     >
+
 </head>
 
+
 <body>
+
+
+    <!-- =====================================================
+         NAVBAR
+         ===================================================== -->
 
     <header class="navbar">
 
         <div class="brand">
+
             <div class="brand-icon">
                 IMP
             </div>
 
             <div>
+
                 <h1>
                     Intelligent Media
                 </h1>
@@ -35,20 +46,39 @@
                 <span>
                     Processing Pipeline
                 </span>
+
             </div>
+
         </div>
 
+
         <div class="status-indicator">
+
             <span class="status-dot"></span>
+
             System Ready
+
         </div>
+
+<button type="button" id="historyButton" class="secondary-button">
+    History
+</button>
+
 
     </header>
 
 
+
+    <!-- =====================================================
+         MAIN
+         ===================================================== -->
+
     <main class="container">
 
-        <!-- HERO SECTION -->
+
+        <!-- =================================================
+             HERO
+             ================================================= -->
 
         <section class="hero">
 
@@ -76,229 +106,916 @@
         </section>
 
 
-        <!-- UPLOAD SECTION -->
 
-        <section class="upload-section">
+        <!-- =================================================
+             UPLOAD SECTION
+             ================================================= -->
 
-            <div
-                class="upload-box"
-                id="uploadBox"
-            >
+        <section
+            id="uploadSection"
+            class="upload-section"
+        >
 
-                <div class="upload-icon">
-                    ↑
+            <div class="hero-header">
+
+                <div>
+
+                    <span class="eyebrow">
+                        AI-POWERED IMAGE ANALYSIS
+                    </span>
+
+                    <h1>
+                        Upload Vehicle Image
+                    </h1>
+
+                    <p>
+                        Analyze vehicle images for quality issues,
+                        number plates, duplicates and other
+                        potential concerns.
+                    </p>
+
                 </div>
-
-                <h3>
-                    Upload vehicle image
-                </h3>
-
-                <p>
-                    Drag and drop your image here
-                    or browse your computer
-                </p>
-
-                <input
-                    type="file"
-                    id="imageInput"
-                    accept="image/*"
-                    hidden
-                >
-
-                <button
-                    type="button"
-                    class="browse-btn"
-                    id="browseButton"
-                >
-                    Choose Image
-                </button>
-
-                <p
-                    class="file-name"
-                    id="fileName"
-                >
-                </p>
 
             </div>
 
 
+
+            <div class="upload-layout">
+
+
+                <!-- Upload Card -->
+
+                <div class="upload-card">
+
+                    <div
+                        id="uploadBox"
+                        class="upload-box"
+                    >
+
+                        <input
+                            type="file"
+                            id="imageInput"
+                            accept="image/jpeg,image/png,image/webp"
+                            hidden
+                        >
+
+
+                        <div class="upload-icon">
+                            â†‘
+                        </div>
+
+
+                        <h2>
+                            Drag & drop your image
+                        </h2>
+
+
+                        <p class="upload-subtitle">
+                            or click anywhere here to browse
+                        </p>
+
+
+                        <p class="upload-format">
+                            JPG, PNG or WEBP Â· Maximum 10 MB
+                        </p>
+
+
+                        <button
+                            type="button"
+                            id="browseButton"
+                            class="secondary-button"
+                        >
+                            Choose Image
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Preview Card -->
+
+                <div
+                    id="previewCard"
+                    class="preview-card hidden"
+                >
+
+                    <div class="preview-header">
+
+                        <div>
+
+                            <span class="card-label">
+                                SELECTED IMAGE
+                            </span>
+
+                            <h3 id="previewTitle">
+                                Vehicle image
+                            </h3>
+
+                        </div>
+
+
+                        <button
+                            type="button"
+                            id="removeImageButton"
+                            class="icon-button"
+                            title="Remove image"
+                        >
+                            Ã—
+                        </button>
+
+                    </div>
+
+
+                    <div class="image-preview-wrapper">
+
+                        <img
+                            id="imagePreview"
+                            src=""
+                            alt="Selected vehicle"
+                        >
+
+                    </div>
+
+
+                    <div class="file-information">
+
+                        <div>
+
+                            <strong id="fileName">
+                                â€”
+                            </strong>
+
+                            <span id="fileDetails">
+                                â€”
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="ready-indicator">
+
+                        <span class="status-dot"></span>
+
+                        Image ready for analysis
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- Analyze Button -->
+
             <button
-                type="button"
-                class="analyze-btn"
                 id="analyzeButton"
+                class="primary-button analyze-button"
                 disabled
             >
+
+                <span>
+                    âœ¦
+                </span>
+
                 Analyze Image
+
+                <span class="button-arrow">
+                    â†’
+                </span>
+
             </button>
 
         </section>
 
 
-        <!-- PROCESSING SECTION -->
+
+        <!-- =================================================
+             PROCESSING SECTION
+             ================================================= -->
 
         <section
-            class="processing-section hidden"
             id="processingSection"
+            class="processing-section hidden"
         >
 
-            <div class="loader"></div>
 
-            <h3>
-                Analyzing image...
-            </h3>
+            <!-- Processing Header -->
 
-            <p id="processingMessage">
-                Upload received. Starting analysis.
-            </p>
+            <div class="processing-header">
+
+                <span class="eyebrow">
+                    AI PROCESSING
+                </span>
+
+                <h1>
+                    Analyzing Vehicle Image
+                </h1>
+
+                <p id="processingMessage">
+                    Running AI-powered analysis.
+                    This may take a few moments...
+                </p>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 IMPORTANT:
+                 processing-layout contains TWO SIBLINGS:
+
+                 1. processing-card
+                 2. progress-card
+
+                 They must NOT be nested inside each other.
+                 ================================================= -->
+
+            <div class="processing-layout">
+
+
+                <!-- =================================================
+                     LEFT CARD â€” ANALYSIS PIPELINE
+                     ================================================= -->
+
+                <div class="processing-card">
+
+
+                    <div class="processing-card-header">
+
+                        <div>
+
+                            <span class="card-label">
+                                ANALYSIS PIPELINE
+                            </span>
+
+                            <h2>
+                                Image inspection
+                            </h2>
+
+                        </div>
+
+
+                        <span class="live-indicator">
+
+                            <span></span>
+
+                            LIVE
+
+                        </span>
+
+                    </div>
+
+
+
+                    <!-- Pipeline -->
+
+                    <div class="pipeline">
+
+
+                        <!-- Stage 1 -->
+
+                        <div
+                            class="pipeline-step"
+                            data-stage="0"
+                        >
+
+                            <div class="pipeline-icon">
+                                1
+                            </div>
+
+                            <div class="pipeline-content">
+
+                                <h3>
+                                    Image uploaded
+                                </h3>
+
+                                <p>
+                                    File received successfully
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Stage 2 -->
+
+                        <div
+                            class="pipeline-step"
+                            data-stage="1"
+                        >
+
+                            <div class="pipeline-icon">
+                                2
+                            </div>
+
+                            <div class="pipeline-content">
+
+                                <h3>
+                                    Image quality analysis
+                                </h3>
+
+                                <p>
+                                    Checking blur, brightness
+                                    and clarity
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Stage 3 -->
+
+                        <div
+                            class="pipeline-step"
+                            data-stage="2"
+                        >
+
+                            <div class="pipeline-icon">
+                                3
+                            </div>
+
+                            <div class="pipeline-content">
+
+                                <h3>
+                                    Vehicle &amp; plate detection
+                                </h3>
+
+                                <p>
+                                    Detecting vehicle and
+                                    number plate
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Stage 4 -->
+
+                        <div
+                            class="pipeline-step"
+                            data-stage="3"
+                        >
+
+                            <div class="pipeline-icon">
+                                4
+                            </div>
+
+                            <div class="pipeline-content">
+
+                                <h3>
+                                    OCR verification
+                                </h3>
+
+                                <p>
+                                    Extracting and validating
+                                    vehicle number
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Stage 5 -->
+
+                        <div
+                            class="pipeline-step"
+                            data-stage="4"
+                        >
+
+                            <div class="pipeline-icon">
+                                5
+                            </div>
+
+                            <div class="pipeline-content">
+
+                                <h3>
+                                    Duplicate detection
+                                </h3>
+
+                                <p>
+                                    Checking for similar images
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Stage 6 -->
+
+                        <div
+                            class="pipeline-step"
+                            data-stage="5"
+                        >
+
+                            <div class="pipeline-icon">
+                                6
+                            </div>
+
+                            <div class="pipeline-content">
+
+                                <h3>
+                                    Finalizing results
+                                </h3>
+
+                                <p>
+                                    Generating analysis report
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+                    </div>
+                    <!-- END PIPELINE -->
+
+
+                </div>
+                <!-- END PROCESSING CARD -->
+
+
+
+                <!-- =================================================
+                     RIGHT CARD â€” PROGRESS
+                     ================================================= -->
+
+                <div class="progress-card">
+
+
+                    <!-- Progress Ring -->
+
+                    <div class="progress-ring">
+
+                        <svg
+                            class="progress-svg"
+                            viewBox="0 0 120 120"
+                        >
+
+                            <circle
+                                class="progress-track"
+                                cx="60"
+                                cy="60"
+                                r="50"
+                            >
+                            </circle>
+
+
+                            <circle
+                                class="progress-value"
+                                cx="60"
+                                cy="60"
+                                r="50"
+                            >
+                            </circle>
+
+                        </svg>
+
+
+                        <div class="progress-center">
+
+                            <strong id="progressPercentage">
+                                0%
+                            </strong>
+
+                            <span id="progressLabel">
+                                Waiting...
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Processing ID -->
+
+                    <div class="processing-id-card">
+
+                        <span>
+                            PROCESSING ID
+                        </span>
+
+                        <strong id="processingIdDisplay">
+                            Generating...
+                        </strong>
+
+                    </div>
+
+
+
+                    <!-- Estimated Time -->
+
+                    <div class="time-card">
+
+                        <span class="time-icon">
+                            â—·
+                        </span>
+
+                        <div>
+
+                            <span>
+                                Estimated time
+                            </span>
+
+                            <strong id="estimatedTime">
+                                Processing...
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+
+                </div>
+                <!-- END PROGRESS CARD -->
+
+
+            </div>
+            <!-- END PROCESSING LAYOUT -->
+
 
         </section>
+        <!-- END PROCESSING SECTION -->
 
 
-        <!-- RESULTS SECTION -->
+
+        <!-- =================================================
+             RESULTS SECTION
+             ================================================= -->
 
         <section
-            class="results-section hidden"
             id="resultsSection"
+            class="results-section hidden"
         >
+
+
+            <!-- Results Header -->
 
             <div class="results-header">
 
                 <div>
+
                     <span class="eyebrow">
                         ANALYSIS COMPLETE
                     </span>
 
-                    <h2>
-                        Processing Results
-                    </h2>
+                    <h1>
+                        Vehicle Image Results
+                    </h1>
+
+                    <p>
+                        AI-powered inspection results
+                        for the uploaded image.
+                    </p>
+
                 </div>
 
-                <span
-                    class="overall-status"
-                    id="overallStatus"
+
+                <button
+                    id="newAnalysisButton"
+                    class="secondary-button"
                 >
-                    Review
-                </span>
+                    + New Analysis
+                </button>
 
             </div>
 
 
-            <!-- VEHICLE NUMBER -->
 
-            <div class="vehicle-card">
+            <!-- =================================================
+                 OVERALL RESULT
+                 ================================================= -->
+
+            <div
+                id="overallResultBanner"
+                class="result-banner"
+            >
+
+                <div class="result-banner-icon">
+                    âœ“
+                </div>
 
                 <div>
 
                     <span class="card-label">
-                        VEHICLE NUMBER
+                        OVERALL RESULT
                     </span>
 
-                    <h3 id="vehicleNumber">
-                        —
-                    </h3>
+                    <h2 id="overallStatus">
+                        Analysis Complete
+                    </h2>
 
-                    <p id="vehicleMessage">
-                        —
+                    <p id="overallMessage">
+                        The image has been successfully
+                        analyzed.
                     </p>
 
                 </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 RESULT CARDS
+                 ================================================= -->
+
+            <div class="result-grid">
+
+
+                <!-- Vehicle Number -->
+
+                <div class="result-card vehicle-result-card">
+
+                    <div class="result-card-header">
+
+                        <div>
+
+                            <span class="card-label">
+                                VEHICLE NUMBER
+                            </span>
+
+                            <h3>
+                                Detected Number Plate
+                            </h3>
+
+                        </div>
+
+
+                        <span class="result-icon">
+                            â–£
+                        </span>
+
+                    </div>
+
+
+                    <div class="vehicle-number-display">
+
+                        <span id="vehicleNumber">
+                            Not detected
+                        </span>
+
+                    </div>
+
+
+                    <p
+                        id="vehicleMessage"
+                        class="result-description"
+                    >
+                        Vehicle number detection result.
+                    </p>
+
+
+                    <div class="confidence-row">
+
+                        <span>
+                            Detection confidence
+                        </span>
+
+                        <strong id="vehicleConfidence">
+                            0%
+                        </strong>
+
+                    </div>
+
+
+                    <div class="confidence-bar">
+
+                        <div
+                            id="vehicleConfidenceBar"
+                            class="confidence-fill"
+                        >
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- OCR -->
+
+                <div class="result-card">
+
+                    <div class="result-card-header">
+
+                        <div>
+
+                            <span class="card-label">
+                                OCR ANALYSIS
+                            </span>
+
+                            <h3>
+                                Recognition Details
+                            </h3>
+
+                        </div>
+
+
+                        <span class="result-icon">
+                            âŒ•
+                        </span>
+
+                    </div>
+
+
+                    <div class="ocr-details">
+
+
+                        <div class="detail-row">
+
+                            <span>
+                                OCR Engine
+                            </span>
+
+                            <strong id="ocrEngine">
+                                â€”
+                            </strong>
+
+                        </div>
+
+
+                        <div class="detail-row">
+
+                            <span>
+                                OCR Confidence
+                            </span>
+
+                            <strong id="ocrConfidence">
+                                â€”
+                            </strong>
+
+                        </div>
+
+
+                        <div class="detail-row">
+
+                            <span>
+                                Recognized Text
+                            </span>
+
+                            <strong id="ocrText">
+                                â€”
+                            </strong>
+
+                        </div>
+
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+                 QUALITY & SECURITY CHECKS
+                 ================================================= -->
+
+            <div class="checks-section">
+
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            IMAGE INSPECTION
+                        </span>
+
+                        <h2>
+                            Quality &amp; Security Checks
+                        </h2>
+
+                    </div>
+
+
+                    <span
+                        id="checksSummary"
+                        class="checks-summary"
+                    >
+                        Analysis results
+                    </span>
+
+                </div>
+
 
                 <div
-                    class="confidence"
-                    id="vehicleConfidence"
+                    id="checksGrid"
+                    class="checks-grid"
                 >
-                    0%
                 </div>
+
 
             </div>
 
 
-            <!-- CHECKS -->
 
-            <h3 class="section-title">
-                Image Analysis
-            </h3>
+            <!-- =================================================
+                 RESULTS FOOTER
+                 ================================================= -->
 
-            <div
-                class="checks-grid"
-                id="checksGrid"
-            >
-                <!-- Generated by JavaScript -->
-            </div>
+            <div class="results-footer">
 
 
-            <!-- OCR -->
+                <div class="footer-info">
 
-            <div class="ocr-card">
+                    <span class="status-dot"></span>
 
-                <div class="card-heading">
-                    <div>
-                        <span class="card-label">
-                            OCR
-                        </span>
-
-                        <h3>
-                            Text Recognition
-                        </h3>
-                    </div>
-                </div>
-
-                <div class="ocr-details">
-
-                    <div>
-                        <span>
-                            Engine
-                        </span>
-
-                        <strong id="ocrEngine">
-                            —
-                        </strong>
-                    </div>
-
-                    <div>
-                        <span>
-                            Confidence
-                        </span>
-
-                        <strong id="ocrConfidence">
-                            —
-                        </strong>
-                    </div>
-
-                </div>
-
-                <div class="ocr-text">
                     <span>
-                        Extracted Text
+                        Analysis stored successfully
                     </span>
 
-                    <p id="ocrText">
-                        —
-                    </p>
                 </div>
+
+
+                <button
+                    id="newAnalysisButtonBottom"
+                    class="primary-button"
+                >
+                    Analyze Another Image â†’
+                </button>
+
 
             </div>
 
 
-            <button
-                type="button"
-                class="new-analysis-btn"
-                id="newAnalysisButton"
-            >
-                Analyze Another Image
-            </button>
-
         </section>
+        <!-- END RESULTS SECTION -->
+
 
     </main>
 
+<section id="historySection" class="history-section hidden" hidden>
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">PREVIOUS ANALYSES</span>
+            <h2>Image Analysis History</h2>
+            <p>Review previous uploads and retrieve their results.</p>
+        </div>
+        <button id="refreshHistoryButton" class="secondary-button" type="button">
+            â†» Refresh
+        </button>
+    </div>
+
+    <div class="history-toolbar">
+        <input
+            id="historySearch"
+            type="search"
+            placeholder="Search filename or processing ID..."
+            aria-label="Search analysis history"
+        >
+        <button id="searchHistoryButton" class="secondary-button" type="button">
+            Search
+        </button>
+    </div>
+
+    <p id="historyMessage" role="status" aria-live="polite"></p>
+
+    <div id="historyList" class="history-list">
+        <p>Loading analysis history...</p>
+    </div>
+</section>
+
+
+
+    <!-- =====================================================
+         FOOTER
+         ===================================================== -->
 
     <footer>
+
         Intelligent Media Processing Pipeline
+
     </footer>
 
 
+
+    <!-- =====================================================
+         JAVASCRIPT
+         ===================================================== -->
+
     <script src="js/app.js"></script>
 
+
 </body>
+
 </html>
