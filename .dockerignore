@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.git/
+.env
+models/
+uploads/
+mysql-data/
+redis-data/
+docker-data/
+plate-debug/
+plate_debug/
+debug-output/

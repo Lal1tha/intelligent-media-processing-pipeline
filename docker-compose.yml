@@ -1,4 +1,4 @@
-services:
+﻿services:
   mysql:
     image: mysql:8.4
     environment:
@@ -21,6 +21,7 @@ services:
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/media_pipeline
     depends_on:
       mysql: { condition: service_healthy }
+
   api:
     build: .
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -28,11 +29,15 @@ services:
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/media_pipeline
       REDIS_URL: redis://redis:6379/0
       UPLOAD_DIR: /data/uploads
+
     ports: ["8000:8000"]
-    volumes: ["uploads_data:/data/uploads"]
+    volumes:
+      - uploads_data:/data/uploads
+
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
+
   worker:
     build: .
     command: rq worker media-processing --url redis://redis:6379/0
@@ -40,10 +45,14 @@ services:
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/media_pipeline
       REDIS_URL: redis://redis:6379/0
       UPLOAD_DIR: /data/uploads
-    volumes: ["uploads_data:/data/uploads"]
+
+    volumes:
+      - uploads_data:/data/uploads
+
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
+
 volumes:
   mysql_data:
   uploads_data:

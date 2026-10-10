@@ -4067,3 +4067,394 @@ footer {
         flex: 1;
     }
 }
+
+/* Vehicle classification and registration location cards */
+
+.location-details {
+    display: grid;
+    gap: 12px;
+    margin: 18px 0;
+}
+
+.location-details .detail-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.location-details .detail-row span {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.location-details .detail-row strong {
+    max-width: 60%;
+    text-align: right;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+}
+
+#vehicleType {
+    margin: 20px 0 10px;
+    color: var(--text-primary);
+    font-size: 25px;
+    font-weight: 800;
+}
+
+#vehicleTypeMessage,
+#registrationLocationMessage {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+    .location-details .detail-row {
+        gap: 10px;
+    }
+
+    .location-details .detail-row strong {
+        max-width: 55%;
+    }
+}
+
+/* =====================================================
+   COMPACT UPLOAD & IMAGE PREVIEW
+   ===================================================== */
+
+/* Reduce excessive page spacing */
+.container {
+    padding-top: 32px;
+    padding-bottom: 48px;
+}
+
+/* The upload section already has its own heading.
+   Hide the extra large hero section above it. */
+.hero {
+    display: none;
+}
+
+/* Compact upload heading */
+.hero-header {
+    padding: 16px 0 20px;
+}
+
+.hero-header h1 {
+    font-size: clamp(26px, 3vw, 36px);
+}
+
+.hero-header p {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Smaller, balanced upload and preview cards */
+.upload-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    align-items: start;
+}
+
+.upload-card,
+.preview-card {
+    min-height: 0;
+    padding: 14px;
+    border-radius: 18px;
+}
+
+/* Reduce the empty drop-zone space */
+.upload-box {
+    min-height: 300px;
+    height: 300px;
+    padding: 20px;
+    border-radius: 14px;
+}
+
+.upload-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 14px;
+    font-size: 30px;
+}
+
+.upload-box h2 {
+    font-size: 18px;
+}
+
+.upload-format {
+    margin-bottom: 16px;
+}
+
+/* Keep preview within a predictable height */
+.preview-card {
+    gap: 0;
+}
+
+.image-preview-wrapper {
+    flex: none;
+    height: 260px;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+}
+
+.image-preview-wrapper img {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    object-fit: contain;
+}
+
+/* Tighter file details */
+.file-information {
+    padding: 10px 4px 8px;
+}
+
+.ready-indicator {
+    padding: 8px 10px;
+}
+
+/* Smaller analyze button spacing */
+.analyze-button {
+    margin-top: 18px;
+    padding: 13px 20px;
+}
+
+/* Keep the layout usable on smaller screens */
+@media (max-width: 800px) {
+    .container {
+        padding-top: 24px;
+        padding-bottom: 36px;
+    }
+
+    .upload-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .upload-box {
+        height: auto;
+        min-height: 260px;
+    }
+
+    .image-preview-wrapper {
+        height: 280px;
+    }
+}
+
+@media (max-width: 480px) {
+    .image-preview-wrapper {
+        height: 220px;
+    }
+
+    .upload-box {
+        min-height: 240px;
+        padding: 16px;
+    }
+}
+
+/* =====================================================
+   RESULTS PAGE LAYOUT FIX
+   ===================================================== */
+
+.results-section {
+    width: min(1200px, 94%);
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 0 48px;
+}
+
+.results-header {
+    margin-bottom: 22px;
+}
+
+.result-banner {
+    padding: 18px 22px;
+    margin-bottom: 20px;
+}
+
+.result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.result-card {
+    min-width: 0;
+    padding: 22px;
+    border-radius: 16px;
+}
+
+.result-card-header {
+    margin-bottom: 18px;
+}
+
+.result-card-header h3 {
+    font-size: 18px;
+}
+
+/* Prevent long values from stretching cards */
+.detail-row {
+    gap: 16px;
+    padding: 12px 0;
+}
+
+.detail-row span {
+    flex: 0 0 auto;
+}
+
+.detail-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* More compact quality checks */
+.checks-section {
+    margin-top: 8px;
+}
+
+.checks-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.check-card {
+    min-height: 125px;
+    padding: 16px;
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+    .results-section {
+        width: 92%;
+    }
+
+    .result-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .checks-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+    .results-section {
+        width: 92%;
+        padding-top: 24px;
+    }
+
+    .results-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .results-header h1 {
+        font-size: 28px;
+    }
+
+    .result-grid,
+    .checks-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .result-card {
+        padding: 18px;
+    }
+
+    .vehicle-number-display {
+        padding: 14px 8px;
+    }
+
+    .vehicle-number-display span {
+        font-size: clamp(20px, 6vw, 30px);
+        letter-spacing: 2px;
+        overflow-wrap: anywhere;
+    }
+
+    .results-footer {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 16px;
+    }
+}
+
+/* Results layout */
+#resultsSection .result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    align-items: start;
+}
+
+#resultsSection .result-grid > .result-card:nth-child(3) {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+#resultsSection .result-grid > .result-card:nth-child(3) .location-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 28px;
+}
+
+@media (max-width: 900px) {
+    #resultsSection .result-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #resultsSection .result-grid > .result-card:nth-child(3) {
+        grid-column: auto;
+    }
+
+    #resultsSection .result-grid > .result-card:nth-child(3) .location-details {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    #resultsSection .result-grid > .result-card:nth-child(3) .location-details {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Stack all result cards vertically */
+#resultsSection .result-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    align-items: stretch;
+}
+
+#resultsSection .result-grid > .result-card {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    padding: 24px;
+}
+
+/* Keep registration details organized */
+#resultsSection .result-grid > .result-card:nth-child(3) .location-details {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 24px;
+}
+
+#resultsSection .result-card-header h3 {
+    font-size: 19px;
+}
+
+/* Mobile */
+@media (max-width: 650px) {
+    #resultsSection .result-grid > .result-card:nth-child(3) .location-details {
+        grid-template-columns: 1fr;
+    }
+}

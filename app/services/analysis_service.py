@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 
 import cv2
 import numpy as np
@@ -8,6 +8,10 @@ from app.analyzers import image_checks
 from app.analyzers.ocr import detect_vehicle_number, extract_text
 from app.core.config import settings
 from app.db.models import Upload
+#from app.analyzers.vehicle_detection import detect_vehicles
+from app.analyzers.registration_state import (
+    identify_registration_location,
+)
 
 
 def aggregate(checks: dict[str, dict]) -> dict:
@@ -123,6 +127,7 @@ def analyze_upload(upload: Upload, db: Session) -> dict:
 
     checks["ocr"] = extract_text(image)
 
+
     # ---------------------------------------------------------
     # VEHICLE REGISTRATION NUMBER
     # ---------------------------------------------------------
@@ -131,6 +136,34 @@ def analyze_upload(upload: Upload, db: Session) -> dict:
         image,
         checks["ocr"],
     )
+
+    # ---------------------------------------------------------
+    # REGISTRATION STATE AND RTO REGION
+    # ---------------------------------------------------------
+
+    vehicle_number_result = checks["vehicle_number"]
+
+    # Support common OCR result field names.
+    # Adjust this list if your actual OCR response uses another key.
+    registration_number = None
+
+    if isinstance(vehicle_number_result, dict):
+        for key in (
+            "normalized_candidate",
+            "normalized_number",
+            "registration_number",
+            "candidate",
+        ):
+            value = vehicle_number_result.get(key)
+
+            if isinstance(value, str) and value.strip():
+                registration_number = value
+                break
+
+    checks["registration_location"] = (
+        identify_registration_location(registration_number)
+    )
+
 
     # ---------------------------------------------------------
     # SCREENSHOT / PHOTO OF PHOTO

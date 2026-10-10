@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // INTELLIGENT MEDIA PROCESSING PIPELINE
 // FRONTEND APPLICATION
 // ============================================================
@@ -165,8 +165,8 @@ function handleFile(file) {
         imagePreview.onload = function () {
             if (fileDetails) {
                 fileDetails.textContent =
-                    `${formatFileSize(file.size)} • ` +
-                    `${imagePreview.naturalWidth} × ${imagePreview.naturalHeight}`;
+                    `${formatFileSize(file.size)} â€¢ ` +
+                    `${imagePreview.naturalWidth} Ã— ${imagePreview.naturalHeight}`;
             }
         };
 
@@ -449,6 +449,37 @@ function displayResults(data) {
     const vehicle = checks.vehicle_number || {};
     const ocr = checks.ocr || {};
 
+
+    // Registration state and RTO region
+    const location = checks.registration_location || {};
+
+    const locationFields = {
+        registrationState: location.registration_state,
+        registrationStateCode: location.registration_state_code,
+        registrationRtoCode: location.rto_code,
+        registrationRegion: location.registration_region,
+        registrationDistrict: location.registration_district,
+        registrationSeries: location.registration_series
+    };
+
+    for (const [id, value] of Object.entries(locationFields)) {
+        const element = document.getElementById(id);
+
+        if (element) {
+            element.textContent = value || "Not available";
+        }
+    }
+
+    const locationMessage = document.getElementById(
+        "registrationLocationMessage"
+    );
+
+    if (locationMessage) {
+        locationMessage.textContent =
+            location.message || "Registration location was not identified.";
+    }
+
+
     // Vehicle number
     const detectedPlate =
         vehicle.normalized_candidate ||
@@ -611,7 +642,7 @@ function renderChecks(checks) {
 
     if (checksSummary) {
         checksSummary.textContent =
-            `${passed} passed • ${warnings} warnings • ${failed} failed`;
+            `${passed} passed â€¢ ${warnings} warnings â€¢ ${failed} failed`;
     }
 
     if (displayed === 0) {
@@ -729,8 +760,8 @@ function getCheckMessage(check) {
 }
 
 function getStatusIcon(status) {
-    if (status === "pass") return "✓";
-    if (status === "fail") return "✕";
+    if (status === "pass") return "âœ“";
+    if (status === "fail") return "âœ•";
     return "!";
 }
 
@@ -779,7 +810,7 @@ function updateOverallBanner(data, checks, vehicle) {
             summary.message ||
             "The image did not meet the required validation criteria.";
         bannerClass = "rejected";
-        icon = "✕";
+        icon = "âœ•";
     } else if (
         ["approved", "accepted", "passed", "success", "valid"].includes(
             backendStatus
@@ -790,7 +821,7 @@ function updateOverallBanner(data, checks, vehicle) {
             summary.message ||
             "The image passed the overall validation.";
         bannerClass = "approved";
-        icon = "✓";
+        icon = "âœ“";
     } else if (hasFailedChecks) {
         finalStatus = "Needs Review";
         message = "One or more image-quality checks failed.";
@@ -1079,7 +1110,7 @@ function getImageDimensions(file) {
         const url = URL.createObjectURL(file);
 
         image.onload = () => {
-            resolve(`${image.naturalWidth} × ${image.naturalHeight}`);
+            resolve(`${image.naturalWidth} Ã— ${image.naturalHeight}`);
             URL.revokeObjectURL(url);
         };
 
@@ -1145,12 +1176,28 @@ async function loadAnalysisHistory(search = "") {
             const id = document.createElement("p");
             id.textContent = `Processing ID: ${item.processing_id || "Unavailable"}`;
 
+
             const date = document.createElement("p");
+
             date.textContent = `Uploaded: ${
                 item.created_at
-                    ? new Date(item.created_at).toLocaleString()
-                    : "Unknown"
+                    ? new Date(
+                            item.created_at.endsWith("Z")
+                            ? item.created_at
+                            : item.created_at + "Z"
+                    ).toLocaleString("en-IN", {
+                        timeZone: "Asia/Kolkata",
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: true
+                    })
+                : "Unknown"
             }`;
+
 
             const status = document.createElement("p");
             status.textContent = `Processing status: ${item.status || "Unknown"}`;

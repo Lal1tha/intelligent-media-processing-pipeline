@@ -631,7 +631,8 @@ def detect_plate_regions(
             if (
                 box_width < min_width
                 or box_height < min_height
-                or not 1.1 <= ratio <= 12.0
+                or area < max(180, int(height * width * 0.00015))
+                or not 0.25 <= ratio <= 12.0
             ):
                 continue
 
@@ -703,48 +704,30 @@ def detect_plate_regions(
                 / 128.0
             )
 
-            ratio_score = max(
+            horizontal_ratio_score = max(
                 0.0,
-                1
-                - abs(
-                    ratio - 3.5
-                )
-                / 5.0,
+                1.0 - abs(ratio - 3.5) / 5.0,
             )
 
+            vertical_ratio_score = max(
+            0.0,
+            1.0 - abs(ratio - 0.65) / 1.2,
+            )
+
+            ratio_score = max(
+            horizontal_ratio_score,
+            vertical_ratio_score,
+            )
+
+
             score = (
-                0.27 * ratio_score
-                + 0.15
-                * min(
-                    1.0,
-                    rectangularity,
-                )
-                + 0.18
-                * min(
-                    1.0,
-                    vertical_edges * 4,
-                )
-                + 0.15
-                * min(
-                    1.0,
-                    text_density * 4,
-                )
-                + 0.07
-                * min(
-                    1.0,
-                    contrast,
-                )
-                + 0.08
-                * min(
-                    1.0,
-                    yellow_support * 3,
-                )
-                + 0.10
-                * min(
-                    1.0,
-                    dark_on_yellow_support
-                    * 6,
-                )
+                0.32 * ratio_score
+                + 0.18 * min(1.0, rectangularity)
+                + 0.20 * min(1.0, vertical_edges * 4)
+                + 0.20 * min(1.0, text_density * 4)
+                + 0.07 * min(1.0, contrast)
+                + 0.02 * min(1.0, yellow_support * 3)
+                + 0.01 * min(1.0, dark_on_yellow_support * 6)
             )
 
             padding_x = max(
@@ -900,96 +883,93 @@ def _add_padding(
 # PLATE PREPROCESSING
 # ---------------------------------------------------------------------------
 
+
 def _plate_variants(
     crop: np.ndarray,
 ) -> list[tuple[str, np.ndarray]]:
-    """Generate a small, high-value set of preprocessing variants for OCR."""
+    """Generate OCR variants for horizontal and vertical plates."""
 
     if crop is None or crop.size == 0:
         return []
 
     variants: list[tuple[str, np.ndarray]] = []
+    orientations = [
+        ("original", crop),
+        (
+            "rotate_cw",
+            cv2.rotate(crop, cv2.ROTATE_90_CLOCKWISE),
+        ),
+        (
+            "rotate_ccw",
+            cv2.rotate(crop, cv2.ROTATE_90_COUNTERCLOCKWISE),
+        ),
+    ]
 
-    # Keep the paddings that are most useful for plate OCR.
-    # pad0.2_otsu was successful on the test vehicle image.
-    for padding in (0.20, 0.00):
+    for orientation_name, oriented in orientations:
+        for padding in (0.20, 0.00):
+            padded = _add_padding(oriented, padding)
 
-        padded = _add_padding(crop, padding)
+            gray = cv2.cvtColor(
+                padded,
+                cv2.COLOR_BGR2GRAY,
+            )
 
-        gray = cv2.cvtColor(
-            padded,
-            cv2.COLOR_BGR2GRAY,
-        )
+            enlarged = cv2.resize(
+                gray,
+                None,
+                fx=4,
+                fy=4,
+                interpolation=cv2.INTER_CUBIC,
+            )
 
-        enlarged = cv2.resize(
-            gray,
-            None,
-            fx=4,
-            fy=4,
-            interpolation=cv2.INTER_CUBIC,
-        )
+            clahe = cv2.createCLAHE(
+                clipLimit=3.0,
+                tileGridSize=(8, 8),
+            ).apply(enlarged)
 
-        clahe = cv2.createCLAHE(
-            clipLimit=3.0,
-            tileGridSize=(8, 8),
-        ).apply(enlarged)
+            denoised = cv2.GaussianBlur(
+                clahe,
+                (3, 3),
+                0,
+            )
 
-        denoised = cv2.GaussianBlur(
-            clahe,
-            (3, 3),
-            0,
-        )
+            otsu = cv2.threshold(
+                denoised,
+                0,
+                255,
+                cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+            )[1]
 
-        otsu = cv2.threshold(
-            denoised,
-            0,
-            255,
-            cv2.THRESH_BINARY + cv2.THRESH_OTSU,
-        )[1]
+            adaptive = cv2.adaptiveThreshold(
+                denoised,
+                255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY,
+                31,
+                7,
+            )
 
-        adaptive = cv2.adaptiveThreshold(
-            denoised,
-            255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            31,
-            7,
-        )
+            _, dark_on_yellow = _yellow_dark_text_mask(
+                padded,
+                gray,
+            )
 
-        # Yellow plate / dark text preprocessing
-        _, dark_on_yellow = _yellow_dark_text_mask(
-            padded,
-            gray,
-        )
+            yellow_dark = cv2.resize(
+                dark_on_yellow,
+                None,
+                fx=4,
+                fy=4,
+                interpolation=cv2.INTER_CUBIC,
+            )
 
-        yellow_dark = cv2.resize(
-            dark_on_yellow,
-            None,
-            fx=4,
-            fy=4,
-            interpolation=cv2.INTER_CUBIC,
-        )
+            prefix = f"{orientation_name}_pad{padding}"
 
-        variants.extend(
-            [
-                (
-                    f"pad{padding}_otsu",
-                    otsu,
-                ),
-                (
-                    f"pad{padding}_gray",
-                    enlarged,
-                ),
-                (
-                    f"pad{padding}_adaptive",
-                    adaptive,
-                ),
-                (
-                    f"pad{padding}_yellow_dark",
-                    yellow_dark,
-                ),
-            ]
-        )
+            variants.extend([
+                (f"{prefix}_otsu", otsu),
+                (f"{prefix}_gray", enlarged),
+                (f"{prefix}_adaptive", adaptive),
+                (f"{prefix}_yellow_dark", yellow_dark),
+            ])
 
     return variants
 

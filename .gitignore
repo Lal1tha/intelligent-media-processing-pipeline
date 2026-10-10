@@ -16,3 +16,5 @@ mysql-data/
 redis-data/
 docker-data/
 *.log
+
+models/

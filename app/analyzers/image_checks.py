@@ -1723,121 +1723,89 @@ def validate_indian_plate(
 
 
 
+
 def screenshot(image: np.ndarray) -> dict:
+    """Estimate screenshot likelihood using weak visual heuristics.
 
-    """Heuristic screenshot detection."""
-
-
+    This is a screening heuristic, not a reliable screenshot classifier.
+    Natural photographs and screenshots can have similar visual properties.
+    """
 
     h, w = image.shape[:2]
+    total_pixels = w * h
 
+    aspect_ratio = w / h if h else 0.0
 
+    common_dimensions = (w, h) in {
+        (1080, 1920),
+        (1920, 1080),
+        (1170, 2532),
+        (1280, 720),
+        (1366, 768),
+        (1440, 900),
+        (1536, 864),
+        (1600, 900),
+    }
 
-    common = (
-
-        (w, h)
-
-        in {
-
-            (1080, 1920),
-
-            (1920, 1080),
-
-            (1170, 2532),
-
-            (1280, 720),
-
-            (1366, 768),
-
-        }
-
+    # These are weak clues only; ordinary photos can share these properties.
+    widescreen_ratio = (
+        1.70 <= aspect_ratio <= 1.80
     )
 
-
+    small_image = (
+        w <= 640 and h <= 480
+    )
 
     edges = cv2.Canny(
-
         gray(image),
-
         100,
-
         200,
-
     )
 
+    edge_density = float((edges > 0).mean())
 
-
-    edge_density = float(
-
-        (edges > 0).mean()
-
-    )
-
-
-
-    uniform = float(
-
+    low_global_variance = float(
         gray(image).std()
-
     ) < 35
 
-
-
+    # Keep the original score components and add small, weak clues.
     score = (
-
-        (0.45 if common else 0)
-
+        (0.45 if common_dimensions else 0.0)
         + min(edge_density * 3, 0.35)
-
-        + (0.2 if uniform else 0)
-
+        + (0.20 if low_global_variance else 0.0)
+        + (0.10 if widescreen_ratio else 0.0)
+        + (0.10 if small_image else 0.0)
     )
 
+    score = min(1.0, score)
 
+    # A lower threshold catches more candidates but may increase
+    # false positives. Treat the outcome as a review signal.
+    threshold = 0.40
+    possible = score >= threshold
 
     return result(
-
-        "warning" if score >= 0.55 else "pass",
-
+        "warning" if possible else "pass",
         (
-
-            "Possible screenshot signal; this is not a definitive classifier."
-
-            if score >= 0.55
-
-            else "No strong screenshot signal."
-
+            "Possible screenshot-like image; manual review may be needed."
+            if possible
+            else "No strong screenshot signal from available heuristics."
         ),
-
         classification=(
-
             "possible"
-
-            if score >= 0.55
-
+            if possible
             else "unlikely"
-
         ),
-
         heuristic_score=round(score, 2),
-
         signals={
-
-            "common_screen_dimensions": common,
-
-            "edge_density": round(
-
-                edge_density,
-
-                3,
-
-            ),
-
-            "low_global_variance": uniform,
-
+            "common_screen_dimensions": common_dimensions,
+            "edge_density": round(edge_density, 3),
+            "low_global_variance": low_global_variance,
+            "widescreen_aspect_ratio": widescreen_ratio,
+            "small_image": small_image,
         },
-
     )
+
 
 
 
@@ -2122,13 +2090,7 @@ def tampering(
 ) -> dict:
 
     """Lightweight image-tampering heuristic."""
-
-
-
     g = gray(image)
-
-
-
     blocks = [
 
         g[y:y + 32, x:x + 32].std()
